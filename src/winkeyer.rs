@@ -1,6 +1,6 @@
 #[repr(u8)]
 #[derive(Clone, Debug)]
-enum Command {
+pub enum Command {
     Admin(AdminCommand) = 0x00,
 
     SidetoneControl(u8) = 0x01,
@@ -123,36 +123,42 @@ impl<'a> TryInto<Vec<u8>> for Command {
                 cmd.append(&mut admin_cmd);
 
                 Ok(cmd)
+            }
+            Command::SidetoneControl(raw_sidetone_control) => {
+                Ok(vec![self.discriminant(), raw_sidetone_control])
+            }
+            Command::SetSpeedWPM(wpm) => match wpm {
+                (5..=99) => Ok(vec![self.discriminant(), wpm]),
+                _ => Err(()),
             },
-            Command::SidetoneControl(raw_sidetone_control) => Ok(vec![self.discriminant(), raw_sidetone_control]),
-            Command::SetSpeedWPM(wpm) => {
-                match wpm {
-                    (5..=99) => Ok(vec![self.discriminant(), wpm]),
-                    _ => Err(())
-                }
+            Command::SetWeighting(weighting) => match weighting {
+                (10..=90) => Ok(vec![self.discriminant(), weighting]),
+                _ => Err(()),
             },
-            Command::SetWeighting(weighting) => {
-                match weighting {
-                    (10..=90) => Ok(vec![self.discriminant(), weighting]),
-                    _ => Err(())
-                }
-            },
-            Command::SetPTTLeadAndTail(lead_in_msecs, tail_delay_msecs) => Ok(vec![self.discriminant(), lead_in_msecs, tail_delay_msecs]),
-            Command::SetSpeedPOT(min, range, _deprecated) => Ok(vec![self.discriminant(), min, range, 0]),
-            Command::SetPaused(paused) => Ok(vec![self.discriminant(), (if paused == 0 { 0 } else { 1 })]),
+            Command::SetPTTLeadAndTail(lead_in_msecs, tail_delay_msecs) => {
+                Ok(vec![self.discriminant(), lead_in_msecs, tail_delay_msecs])
+            }
+            Command::SetSpeedPOT(min, range, _deprecated) => {
+                Ok(vec![self.discriminant(), min, range, 0])
+            }
+            Command::SetPaused(paused) => {
+                Ok(vec![self.discriminant(), (if paused == 0 { 0 } else { 1 })])
+            }
             Command::GetSpeedPOT => Ok(vec![self.discriminant()]),
             Command::DropSerialInputBufferCharacter => Ok(vec![self.discriminant()]),
             Command::SetPinConfig(raw_pin_config) => Ok(vec![self.discriminant(), raw_pin_config]),
             Command::BufferClearBuffer => Ok(vec![self.discriminant()]),
-            Command::SetKeyDown(updown) => Ok(vec![self.discriminant(), (if updown == 0 { 0 } else { 1 })]),
+            Command::SetKeyDown(updown) => {
+                Ok(vec![self.discriminant(), (if updown == 0 { 0 } else { 1 })])
+            }
             Command::SetHighSpeedCW(raw_lpm_rate) => Ok(vec![self.discriminant(), raw_lpm_rate]),
-            Command::SetSpeedFarnsworthWPM(wpm) => Ok(vec![self.discriminant(), wpm]),,
+            Command::SetSpeedFarnsworthWPM(wpm) => Ok(vec![self.discriminant(), wpm]),
             Command::SetKeyerMode(raw_keyer_mode) => Ok(vec![self.discriminant(), raw_keyer_mode]),
             Command::LoadSettings(ref raw_settings) => {
                 let mut cmd: Vec<u8> = vec![self.discriminant()];
                 cmd.append(&mut raw_settings.clone());
                 Ok(cmd)
-            },
+            }
             Command::SetKeyingExtendedFirstSend(msecs) => Ok(vec![self.discriminant(), msecs]),
             Command::SetKeyingCompensation(msecs) => Ok(vec![self.discriminant(), msecs]),
             Command::NoOp => Ok(vec![self.discriminant()]),
@@ -165,7 +171,7 @@ impl<'a> TryInto<Vec<u8>> for Command {
             Command::SetKeyerDitDahRatio(ratio) => Ok(vec![self.discriminant(), ratio]),
             Command::BufferDoPTT(ptt) => {
                 Ok(vec![self.discriminant(), (if ptt == 0 { 0 } else { 1 })])
-            },
+            }
             Command::BufferAssertKey(assertion) => Ok(vec![self.discriminant(), assertion]),
             Command::BufferSleep(secs) => Ok(vec![self.discriminant(), secs]),
             Command::BufferMergeLetters(_, _) => todo!(),
@@ -181,7 +187,7 @@ impl<'a> TryInto<Vec<u8>> for Command {
 #[repr(u8)]
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug)]
-enum KeyInput {
+pub enum KeyInput {
     Release = 0x00,
     Dit = 0x01,
     Dah = 0x02,
@@ -206,7 +212,7 @@ where
 #[non_exhaustive]
 #[repr(u8)]
 #[derive(Clone, Debug)]
-enum AdminCommand {
+pub enum AdminCommand {
     // 0: Calibrate For WK1 send <00><00> pause 100 mSec <FF>
     // Ignored by WK2 and WK3
     Calibrate = 0x0,
