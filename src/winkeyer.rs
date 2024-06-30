@@ -1,5 +1,5 @@
 #[repr(u8)]
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone,Debug)]
 enum Command {
     Admin(AdminCommand) = 0x00,
 
@@ -111,7 +111,7 @@ impl<'a> TryInto<Vec<u8>> for Command {
 
     fn try_into(self) -> Result<Vec<u8>, Self::Error> {
         match self {
-            Command::Admin(admin_command) => {
+            Command::Admin(ref admin_command) => {
                 let mut cmd: Vec<u8> = vec![self.discriminant()];
                 let mut admin_cmd: Vec<u8> = admin_command.clone().try_into().expect("build admin command bytes");
 
@@ -125,10 +125,10 @@ impl<'a> TryInto<Vec<u8>> for Command {
             Command::SetPTTLeadAndTail(_, _) => todo!(),
             Command::SetSpeedPOT(_, _, _) => todo!(),
             Command::SetPaused(_) => todo!(),
-            Command::GetSpeedPOT => todo!(),
-            Command::DropSerialInputBufferCharacter => todo!(),
+            Command::GetSpeedPOT => Ok(vec![self.discriminant()]),
+            Command::DropSerialInputBufferCharacter => Ok(vec![self.discriminant()]),
             Command::SetPincfg(_) => todo!(),
-            Command::BufferClearBuffer => todo!(),
+            Command::BufferClearBuffer => Ok(vec![self.discriminant()]),
             Command::SetKeyDown(_) => todo!(),
             Command::SetHighSpeedCW(_) => todo!(),
             Command::SetSpeedFarnsworthWPM(_) => todo!(),
@@ -136,19 +136,21 @@ impl<'a> TryInto<Vec<u8>> for Command {
             Command::LoadSettings(_) => todo!(),
             Command::SetKeyingExtendedFirstSend(_) => todo!(),
             Command::SetKeyingCompensation(_) => todo!(),
-            Command::NoOp => todo!(),
-            Command::DoKey(_) => todo!(),
-            Command::GetKeyerStatus => todo!(),
+            Command::NoOp => Ok(vec![self.discriminant()]),
+            Command::DoKey(key_input) => {
+                Ok(vec![self.discriminant(), key_input.try_into().expect("key input")])
+            },
+            Command::GetKeyerStatus => Ok(vec![self.discriminant()]),
             Command::SetInputBufferCursor(_) => todo!(),
-            Command::SetKeyerDitDahRatio => todo!(),
+            Command::SetKeyerDitDahRatio => Ok(vec![self.discriminant()]),
             Command::BufferDoPTT(_) => todo!(),
             Command::BufferAssertKey(_) => todo!(),
             Command::BufferSleep(_) => todo!(),
             Command::BufferMergeLetters(_, _) => todo!(),
             Command::BufferSetSpeedWPM(_) => todo!(),
             Command::BufferSetHighSpeedCW(_) => todo!(),
-            Command::BufferCancelSpeedChange => todo!(),
-            Command::BufferedNoOp => todo!(),
+            Command::BufferCancelSpeedChange => Ok(vec![self.discriminant()]),
+            Command::BufferedNoOp => Ok(vec![self.discriminant()]),
             Command::Other(c) => Ok(vec![c]),
         }
     }
@@ -164,6 +166,14 @@ enum KeyInput {
     Both = 0x03, // implying this respects configured behavior (dit-dah, dah-dit, iambic handling)
 }
 
+impl TryInto<u8> for KeyInput {
+    type Error = ();
+
+    fn try_into(self) -> Result<u8, Self::Error> {
+        Ok(self.discriminant())
+    }
+}
+
 trait ProsignMapping
 where
     Self: for<'a> TryFrom<&'a [u8], Error = ()>,
@@ -173,7 +183,7 @@ where
 
 #[non_exhaustive]
 #[repr(u8)]
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone,Debug)]
 enum AdminCommand {
     // 0: Calibrate For WK1 send <00><00> pause 100 mSec <FF>
     // Ignored by WK2 and WK3
@@ -181,21 +191,21 @@ enum AdminCommand {
 
     // 1: Reset Resets the WK3 processor to the power up state. Do not send this as part of the
     // initialization sequence. Only send this if you want to do a cold reboot of WK3.
-    Reset = 0x1,
+    ResetKeyer = 0x1,
 
     // 2: Host Open Upon power-up, the host interface is closed. To enable host mode, the PC host must
     // issue the Admin:open <00><02> command. Upon open, WK3 will respond by sending the
     // revision code back to the host. The host must wait for this return code before any other
     // commands or data can be sent to WK3. Upon open, WK1 mode is set.
-    HostOpen = 0x2,
+    OpenHostConnection = 0x2,
 
     // 3: Host Close Use this command to disable the host interface. WK3 will return to standby mode after this
     // command is issued and standby settings will be restored.
-    HostClose = 0x3,
+    CloseHostConnection = 0x3,
 
     // 4: Echo Test Used to test the serial interface. The next character sent to WK3 after this command will
     // be echoed back to the host. <00><04><65> echoes 65 (letter a)
-    EchoTest = 0x4,
+    EchoTest(u8) = 0x4,
 
     // 5: Paddle A2D Historical command not supported in WK3, always returns 0.
 
@@ -219,7 +229,7 @@ enum AdminCommand {
     DumpEEPROM = 0x12,
 
     // 13: Load EEPROM Download all 256 bytes of WK3’s internal EEPROM.
-    LoadEEPROM = 0x13,
+    LoadEEPROM(Vec<u8>) = 0x13,
 
     // 14: Send Message Command WK3 to send one of its internal messages.
     // The syntax is: <00><14><msg number> where msg number is 1 through 6
@@ -262,26 +272,30 @@ impl TryInto<Vec<u8>> for AdminCommand {
 
     fn try_into(self) -> Result<Vec<u8>, Self::Error> {
         match self {
-            AdminCommand::Calibrate => todo!(),
-            AdminCommand::Reset => todo!(),
-            AdminCommand::HostOpen => todo!(),
-            AdminCommand::HostClose => todo!(),
-            AdminCommand::EchoTest => todo!(),
-            AdminCommand::DebugInternal => todo!(),
-            AdminCommand::GetFirmwareMajorVersion => todo!(),
-            AdminCommand::SetReportingV1 => todo!(),
-            AdminCommand::SetReportingV2 => todo!(),
-            AdminCommand::DumpEEPROM => todo!(),
-            AdminCommand::LoadEEPROM => todo!(),
-            AdminCommand::SendMessageByID => todo!(),
-            AdminCommand::LoadExtensionR1 => todo!(),
-            AdminCommand::FirmwareUpdate => todo!(),
-            AdminCommand::SetBaudRateLow => todo!(),
-            AdminCommand::SetBaudRateHigh => todo!(),
-            AdminCommand::SetRTTYRegisters => todo!(),
-            AdminCommand::SetReportingV3 => todo!(),
-            AdminCommand::GetFirmwareMinorVersion => todo!(),
+            AdminCommand::SetReportingV3 => Ok(vec![self.discriminant()]),
+            AdminCommand::GetFirmwareMinorVersion => Ok(vec![self.discriminant()]),
             AdminCommand::SetSidetoneVolume(vol) => Ok(vec![self.discriminant(), vol]),
+            AdminCommand::Calibrate => Ok(vec![self.discriminant()]),
+            AdminCommand::ResetKeyer => Ok(vec![self.discriminant()]),
+            AdminCommand::OpenHostConnection => Ok(vec![self.discriminant()]),
+            AdminCommand::CloseHostConnection => Ok(vec![self.discriminant()]),
+            AdminCommand::EchoTest(x) => Ok(vec![self.discriminant(), x]),
+            AdminCommand::DebugInternal => Ok(vec![self.discriminant()]),
+            AdminCommand::GetFirmwareMajorVersion => Ok(vec![self.discriminant()]),
+            AdminCommand::SetReportingV1 => Ok(vec![self.discriminant()]),
+            AdminCommand::SetReportingV2 => Ok(vec![self.discriminant()]),
+            AdminCommand::DumpEEPROM => Ok(vec![self.discriminant()]),
+            AdminCommand::LoadEEPROM(ref eeprom) => {
+                let mut cmd = vec![self.discriminant()];
+                cmd.append(&mut eeprom.clone());
+                Ok(cmd)
+            },
+            AdminCommand::SendMessageByID  => Ok(vec![self.discriminant()]),
+            AdminCommand::LoadExtensionR1  => Ok(vec![self.discriminant()]),
+            AdminCommand::FirmwareUpdate   => Ok(vec![self.discriminant()]),
+            AdminCommand::SetBaudRateLow   => Ok(vec![self.discriminant()]),
+            AdminCommand::SetBaudRateHigh  => Ok(vec![self.discriminant()]),
+            AdminCommand::SetRTTYRegisters => Ok(vec![self.discriminant()]),
         }
     }
 }
@@ -303,5 +317,46 @@ impl AdminCommand {
         // between `repr(C)` structs, each of which has the `u8` discriminant as its first
         // field, so we can read the discriminant without offsetting the pointer.
         unsafe { *<*const _>::from(self).cast::<u8>() }
+    }
+}
+
+impl KeyInput {
+    // https://doc.rust-lang.org/stable/std/mem/fn.discriminant.html
+    fn discriminant(&self) -> u8 {
+        // SAFETY: Because `Self` is marked `repr(u8)`, its layout is a `repr(C)` `union`
+        // between `repr(C)` structs, each of which has the `u8` discriminant as its first
+        // field, so we can read the discriminant without offsetting the pointer.
+        unsafe { *<*const _>::from(self).cast::<u8>() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn admin_command() {
+        let admin_command = Command::Admin(AdminCommand::EchoTest(0x88));
+
+        let cmd: Vec<u8> = admin_command.try_into().expect("cmd bytes");
+
+        assert_eq!(cmd, vec![0x00, 0x04, 0x88]);
+
+        let admin_command = Command::Admin(AdminCommand::LoadEEPROM(vec![0xf0, 0xe0, 0xd0]));
+
+        let cmd: Vec<u8> = admin_command.try_into().expect("cmd bytes");
+
+        assert_eq!(cmd, vec![0x00, 0x13, 0xf0, 0xe0, 0xd0]);
+    }
+
+    #[test]
+    fn key_input() {
+        let key_command = Command::DoKey(KeyInput::Dah);
+
+        let cmd: Vec<u8> = key_command.try_into().expect("cmd bytes");
+
+        assert_eq!(cmd, vec![0x14, 0x02]);
+
     }
 }
