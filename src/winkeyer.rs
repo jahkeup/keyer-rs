@@ -1,5 +1,5 @@
 #[repr(u8)]
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 enum Command {
     Admin(AdminCommand) = 0x00,
 
@@ -19,7 +19,7 @@ enum Command {
 
     DropSerialInputBufferCharacter = 0x08,
 
-    SetPincfg(u8) = 0x09,
+    SetPinConfig(u8) = 0x09,
 
     BufferClearBuffer = 0x0a,
 
@@ -74,7 +74,7 @@ enum Command {
 
     SetInputBufferCursor(u8) = 0x16,
 
-    SetKeyerDitDahRatio = 0x17,
+    SetKeyerDitDahRatio(u8) = 0x17,
 
     BufferDoPTT(u8) = 0x18,
 
@@ -92,7 +92,7 @@ enum Command {
 
     BufferedNoOp = 0x1f,
 
-    Other(u8),
+    Other(Vec<u8>),
 }
 
 impl TryInto<u8> for Command {
@@ -100,7 +100,7 @@ impl TryInto<u8> for Command {
 
     fn try_into(self) -> Result<u8, Self::Error> {
         match self {
-            Command::Other(x) => Ok(x),
+            Command::Other(x) => Ok(*x.first().expect("first element must provide command")),
             _ => Ok(self.discriminant()),
         }
     }
@@ -110,55 +110,77 @@ impl<'a> TryInto<Vec<u8>> for Command {
     type Error = ();
 
     fn try_into(self) -> Result<Vec<u8>, Self::Error> {
+        // TODO: break this apart to handle validation separately
+
         match self {
             Command::Admin(ref admin_command) => {
                 let mut cmd: Vec<u8> = vec![self.discriminant()];
-                let mut admin_cmd: Vec<u8> = admin_command.clone().try_into().expect("build admin command bytes");
+                let mut admin_cmd: Vec<u8> = admin_command
+                    .clone()
+                    .try_into()
+                    .expect("build admin command bytes");
 
                 cmd.append(&mut admin_cmd);
 
                 Ok(cmd)
-            }
-            Command::SidetoneControl(_) => todo!(),
-            Command::SetSpeedWPM(_) => todo!(),
-            Command::SetWeighting(_) => todo!(),
-            Command::SetPTTLeadAndTail(_, _) => todo!(),
-            Command::SetSpeedPOT(_, _, _) => todo!(),
-            Command::SetPaused(_) => todo!(),
+            },
+            Command::SidetoneControl(raw_sidetone_control) => Ok(vec![self.discriminant(), raw_sidetone_control]),
+            Command::SetSpeedWPM(wpm) => {
+                match wpm {
+                    (5..=99) => Ok(vec![self.discriminant(), wpm]),
+                    _ => Err(())
+                }
+            },
+            Command::SetWeighting(weighting) => {
+                match weighting {
+                    (10..=90) => Ok(vec![self.discriminant(), weighting]),
+                    _ => Err(())
+                }
+            },
+            Command::SetPTTLeadAndTail(lead_in_msecs, tail_delay_msecs) => Ok(vec![self.discriminant(), lead_in_msecs, tail_delay_msecs]),
+            Command::SetSpeedPOT(min, range, _deprecated) => Ok(vec![self.discriminant(), min, range, 0]),
+            Command::SetPaused(paused) => Ok(vec![self.discriminant(), (if paused == 0 { 0 } else { 1 })]),
             Command::GetSpeedPOT => Ok(vec![self.discriminant()]),
             Command::DropSerialInputBufferCharacter => Ok(vec![self.discriminant()]),
-            Command::SetPincfg(_) => todo!(),
+            Command::SetPinConfig(raw_pin_config) => Ok(vec![self.discriminant(), raw_pin_config]),
             Command::BufferClearBuffer => Ok(vec![self.discriminant()]),
-            Command::SetKeyDown(_) => todo!(),
-            Command::SetHighSpeedCW(_) => todo!(),
-            Command::SetSpeedFarnsworthWPM(_) => todo!(),
-            Command::SetKeyerMode(_) => todo!(),
-            Command::LoadSettings(_) => todo!(),
-            Command::SetKeyingExtendedFirstSend(_) => todo!(),
-            Command::SetKeyingCompensation(_) => todo!(),
-            Command::NoOp => Ok(vec![self.discriminant()]),
-            Command::DoKey(key_input) => {
-                Ok(vec![self.discriminant(), key_input.try_into().expect("key input")])
+            Command::SetKeyDown(updown) => Ok(vec![self.discriminant(), (if updown == 0 { 0 } else { 1 })]),
+            Command::SetHighSpeedCW(raw_lpm_rate) => Ok(vec![self.discriminant(), raw_lpm_rate]),
+            Command::SetSpeedFarnsworthWPM(wpm) => Ok(vec![self.discriminant(), wpm]),,
+            Command::SetKeyerMode(raw_keyer_mode) => Ok(vec![self.discriminant(), raw_keyer_mode]),
+            Command::LoadSettings(ref raw_settings) => {
+                let mut cmd: Vec<u8> = vec![self.discriminant()];
+                cmd.append(&mut raw_settings.clone());
+                Ok(cmd)
             },
+            Command::SetKeyingExtendedFirstSend(msecs) => Ok(vec![self.discriminant(), msecs]),
+            Command::SetKeyingCompensation(msecs) => Ok(vec![self.discriminant(), msecs]),
+            Command::NoOp => Ok(vec![self.discriminant()]),
+            Command::DoKey(key_input) => Ok(vec![
+                self.discriminant(),
+                key_input.try_into().expect("key input"),
+            ]),
             Command::GetKeyerStatus => Ok(vec![self.discriminant()]),
             Command::SetInputBufferCursor(_) => todo!(),
-            Command::SetKeyerDitDahRatio => Ok(vec![self.discriminant()]),
-            Command::BufferDoPTT(_) => todo!(),
-            Command::BufferAssertKey(_) => todo!(),
-            Command::BufferSleep(_) => todo!(),
+            Command::SetKeyerDitDahRatio(ratio) => Ok(vec![self.discriminant(), ratio]),
+            Command::BufferDoPTT(ptt) => {
+                Ok(vec![self.discriminant(), (if ptt == 0 { 0 } else { 1 })])
+            },
+            Command::BufferAssertKey(assertion) => Ok(vec![self.discriminant(), assertion]),
+            Command::BufferSleep(secs) => Ok(vec![self.discriminant(), secs]),
             Command::BufferMergeLetters(_, _) => todo!(),
-            Command::BufferSetSpeedWPM(_) => todo!(),
-            Command::BufferSetHighSpeedCW(_) => todo!(),
+            Command::BufferSetSpeedWPM(speed) => Ok(vec![self.discriminant(), speed]),
+            Command::BufferSetHighSpeedCW(raw_lpm) => Ok(vec![self.discriminant(), raw_lpm]), // as in this value *is* lpm/100
             Command::BufferCancelSpeedChange => Ok(vec![self.discriminant()]),
             Command::BufferedNoOp => Ok(vec![self.discriminant()]),
-            Command::Other(c) => Ok(vec![c]),
+            Command::Other(ref other) => Ok(other.clone()),
         }
     }
 }
 
 #[repr(u8)]
 #[non_exhaustive]
-#[derive(Clone,Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 enum KeyInput {
     Release = 0x00,
     Dit = 0x01,
@@ -183,7 +205,7 @@ where
 
 #[non_exhaustive]
 #[repr(u8)]
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 enum AdminCommand {
     // 0: Calibrate For WK1 send <00><00> pause 100 mSec <FF>
     // Ignored by WK2 and WK3
@@ -289,12 +311,12 @@ impl TryInto<Vec<u8>> for AdminCommand {
                 let mut cmd = vec![self.discriminant()];
                 cmd.append(&mut eeprom.clone());
                 Ok(cmd)
-            },
-            AdminCommand::SendMessageByID  => Ok(vec![self.discriminant()]),
-            AdminCommand::LoadExtensionR1  => Ok(vec![self.discriminant()]),
-            AdminCommand::FirmwareUpdate   => Ok(vec![self.discriminant()]),
-            AdminCommand::SetBaudRateLow   => Ok(vec![self.discriminant()]),
-            AdminCommand::SetBaudRateHigh  => Ok(vec![self.discriminant()]),
+            }
+            AdminCommand::SendMessageByID => Ok(vec![self.discriminant()]),
+            AdminCommand::LoadExtensionR1 => Ok(vec![self.discriminant()]),
+            AdminCommand::FirmwareUpdate => Ok(vec![self.discriminant()]),
+            AdminCommand::SetBaudRateLow => Ok(vec![self.discriminant()]),
+            AdminCommand::SetBaudRateHigh => Ok(vec![self.discriminant()]),
             AdminCommand::SetRTTYRegisters => Ok(vec![self.discriminant()]),
         }
     }
@@ -357,6 +379,5 @@ mod tests {
         let cmd: Vec<u8> = key_command.try_into().expect("cmd bytes");
 
         assert_eq!(cmd, vec![0x14, 0x02]);
-
     }
 }
