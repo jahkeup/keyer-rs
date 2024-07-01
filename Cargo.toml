@@ -2,6 +2,7 @@
 name = "winkeyer"
 version = "0.1.0"
 edition = "2021"
+license = "LGPL-2.1-only OR MIT"
 
 [dependencies]
 env_logger = "0.11.3"
