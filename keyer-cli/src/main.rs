@@ -3,7 +3,7 @@ use std::{io::Write, thread, time::Duration};
 use log::info;
 use serialport;
 
-use winkeyer::winkeyer::{AdminCommand, Command, KeyInput};
+use keyer_protocol::winkeyer::{AdminCommand, Command, KeyInput};
 
 fn main() -> Result<(), Error> {
     env_logger::init();
@@ -17,7 +17,7 @@ fn main() -> Result<(), Error> {
         );
     }
 
-    let port_path = std::env::var("WINKEYER_SERIAL_PORT")?;
+    let port_path = std::env::var("KEYER_SERIAL_PORT")?;
 
     let builder = serialport::new(port_path, 1200);
     dbg!(&builder);
